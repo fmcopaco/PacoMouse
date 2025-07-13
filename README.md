@@ -6,9 +6,10 @@ Firmware for a throttle on the Arduino Nano or Wemos D1 Mini (ESP8266) platform.
   * Control of accesories (turnouts, platform, etc.)
   * CV and LNCV programming
   * Dispatch and phone lock feature
+  * Locking of some features for guest or club use.
   * Automation
   * Games
-  * Rotary for loco speed and direction
+  * Rotary encoder for loco speed and direction
   * Keypad for easy numeric input
   * OLED in different sizes
   * Hardware test program included
@@ -16,6 +17,8 @@ Firmware for a throttle on the Arduino Nano or Wemos D1 Mini (ESP8266) platform.
 ---
 
   ![FirstVersion](images/PacoMouse.jpg)
+
+  ## Videos
 
   [![PacoMouseRun](https://img.youtube.com/vi/anvKXDgOZIg/0.jpg)](https://www.youtube.com/watch?v=anvKXDgOZIg)
 
