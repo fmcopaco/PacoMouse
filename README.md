@@ -13,6 +13,9 @@ Firmware for a throttle on the Arduino Nano or Wemos D1 Mini (ESP8266) platform.
   * Keypad for easy numeric input
   * OLED in different sizes
   * Hardware test program included
+  * Avaiable in different languages:
+
+  ![Lang](images/languages.png)
   
 ---
 
