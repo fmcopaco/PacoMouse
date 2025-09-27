@@ -57,13 +57,13 @@ void lnetSend (lnMsg * Msg) {
   byte n, pos, chk, nibble;
   byte msgLng;
   char msgStr[120];
-/*
-  if (isLBServer)                                                   
-    while (millis() - timeout < 10) {                               // workround for Dasy II WLAN
-      if (updateOLED)                                               // Actualizar pantalla
-        showOLED();
-    }
-    */
+  /*
+    if (isLBServer)
+      while (millis() - timeout < 10) {                               // workround for Dasy II WLAN
+        if (updateOLED)                                               // Actualizar pantalla
+          showOLED();
+      }
+  */
   chk = 0xFF;
   msgLng = getLnMsgSize(Msg);
   //msgLng = ((Msg->sz.command & 0x60) == 0x60) ? Msg->sz.mesg_size : ((Msg->sz.command & 0x60) >> 4) + 2;
@@ -213,6 +213,12 @@ void lnetReceive() {
             case 'D':
             case 'E':
             case 'F':
+            case 'a':                                               // workaround for LocoNetEtherBuffer example of Loconet.h library.
+            case 'b':
+            case 'c':
+            case 'd':
+            case 'e':
+            case 'f':
               RecvPacket.data[rcvStrPos] = (RecvPacket.data[rcvStrPos] << 4) + (rxByte & 0x0F) + 9;
               break;
             case '\n':
