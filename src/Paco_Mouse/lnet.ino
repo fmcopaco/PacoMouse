@@ -66,9 +66,17 @@ void infoLocomotora (unsigned int address) {
   send4byteMsg(OPC_LOCO_ADR, adrH, adrL);                   // REQ loco ADR, expect <E7>SLOT READ
 }
 
+
+byte getMaxStepLnet() {
+  byte stp;
+  stp = stepsLN[mySlot.state & 0x07];
+  return stp;
+}
+
+
 byte getCurrentStep() {
   byte maxStep, calcStep;
-  maxStep = stepsLN[mySlot.state & 0x07];
+  maxStep = getMaxStepLnet();
   if (mySpeed > 1) {
     if (maxStep == 128) {                              // 128 steps -> 0..126
       return (mySpeed - 1);
@@ -367,6 +375,11 @@ void sendSYNC () {                                          // Envia SYNC
 }
 #endif
 
+void showEmergencyOff() {
+  scrOLED = SCR_ERROR;
+  errOLED = ERR_OFF;
+  updateOLED = true;
+}
 
 ////////////////////////////////////////////////////////////
 // ***** LOCONET DECODE *****
@@ -548,21 +561,23 @@ void lnetDecode (lnMsg * LnPacket) {
       }
       break;
     case OPC_GPON:
-      scrOLED = SCR_ENDLOGO;
-      bitSet(mySlot.trk, 0);
-      updateOLED = true;
+      if (!lnetProg) {                                   // workaround for Daisy II WLAN
+        scrOLED = SCR_ENDLOGO;
+        bitSet(mySlot.trk, 0);
+        updateOLED = true;
 #ifdef USE_PHONE
-      phoneCallEnd();
+        phoneCallEnd();
 #endif
+      }
       break;
     case OPC_GPOFF:
-      bitClear(mySlot.trk, 0);
-      scrOLED = SCR_ERROR;
-      errOLED = ERR_OFF;
-      updateOLED = true;
+      if (!lnetProg) {                                  // workaround for Daisy II WLAN
+        bitClear(mySlot.trk, 0);
+        showEmergencyOff();
 #ifdef USE_PHONE
-      phoneCallEnd();
+        phoneCallEnd();
 #endif
+      }
       break;
     case OPC_SL_RD_DATA:                                // informacion de un slot
       adr = (LnPacket->sd.adr2 << 7) + LnPacket->sd.adr;
@@ -687,30 +702,30 @@ void lnetDecode (lnMsg * LnPacket) {
       //  [E5 0F 05 49 4B 1F 01 2F 13 00 00 01 00 00 31]  (LNCV) READ_CV_REPLY from module (Article #5039):
       if ((LnPacket->ub.DSTL == 'I') && (LnPacket->ub.DSTH == 'K')) {
         if ((LnPacket->ub.SRC == 0x05) && (LnPacket->ub.ReqId == LNCV_REQID_CFGREAD)) {
-          for (i = 0; i < 7; i++) {                     // read bits in PXCT1
-            if (bitRead(LnPacket->ub.PXCT1, i)) {
-              bitSet(LnPacket->ub.payload.D[i], 7);
-            }
-          }
-          artNum  = LnPacket->ub.payload.data.deviceClass;
-          numLNCV = LnPacket->ub.payload.data.lncvNumber;
-          valLNCV = LnPacket->ub.payload.data.lncvValue;
+          //DEBUG_MSG("PXCT: %0X", LnPacket->ub.PXCT1)
+          if (bitRead(LnPacket->ub.PXCT1, 0))           // expand bits in PXCT1
+            bitSet(LnPacket->ub.D0, 7);
+          if (bitRead(LnPacket->ub.PXCT1, 1))
+            bitSet(LnPacket->ub.D1, 7);
+          if (bitRead(LnPacket->ub.PXCT1, 2))
+            bitSet(LnPacket->ub.D2, 7);
+          if (bitRead(LnPacket->ub.PXCT1, 3))
+            bitSet(LnPacket->ub.D3, 7);
+          if (bitRead(LnPacket->ub.PXCT1, 4))
+            bitSet(LnPacket->ub.D4, 7);
+          if (bitRead(LnPacket->ub.PXCT1, 5))
+            bitSet(LnPacket->ub.D5, 7);
+          if (bitRead(LnPacket->ub.PXCT1, 6))
+            bitSet(LnPacket->ub.D6, 7);
+          artNum  = LnPacket->ub.D0 | (LnPacket->ub.D1 << 8);
+          numLNCV = LnPacket->ub.D2 | (LnPacket->ub.D3 << 8);
+          valLNCV = LnPacket->ub.D4 | (LnPacket->ub.D5 << 8);
+          DEBUG_MSG("Art: %d LNCV: %d-%d", artNum, numLNCV, valLNCV);
           if (numLNCV == 0)
             modNum = valLNCV;
           if (scrOLED == SCR_LNCV)
             updateOLED = true;
         }
-        /*
-          if ((LnPacket->ub.SRC == 0x00) && (LnPacket->ub.ReqId == 0x0B)) {  // Virtual loco
-          for (i = 0; i < 7; i++) {                     // read bits in PXCT1
-            if (bitRead(LnPacket->ub.PXCT1, i)) {
-              bitSet(LnPacket->ub.payload.D[i], 7);
-            }
-          }
-          myID = LnPacket->ub.payload.data.lncvNumber;
-          virtualLoco = LnPacket->ub.payload.data.lncvValue;
-          }
-        */
       }
 #endif
       break;
@@ -838,7 +853,9 @@ void readCV (unsigned int adr, byte stepPrg) {
     clearPacketUlhi();
 #ifdef USE_PRG_UHLI
     if (typeCmdStation == CMD_DR) {
-      progUhli(UHLI_PRG_START);                             // Intellibox II format
+      if (!modeProg)
+        if (ulhiProg == UHLI_PRG_END)
+          progUhli(UHLI_PRG_START);                                 // Intellibox II format
       SendPacketUhli.data[0] = OPC_IMM_PACKET;
       SendPacketUhli.data[1] = 0x1F;
       SendPacketUhli.data[2] = 0x01;
@@ -883,7 +900,9 @@ void writeCV (unsigned int adr, unsigned int data, byte stepPrg) {
   clearPacketUlhi();
 #ifdef USE_PRG_UHLI
   if (typeCmdStation == CMD_DR) {
-    progUhli(UHLI_PRG_START);                               // Intellibox II format
+    if (!modeProg)
+      if (ulhiProg == UHLI_PRG_END)
+        progUhli(UHLI_PRG_START);                                 // Intellibox II format
     SendPacketUhli.data[0] = OPC_IMM_PACKET;
     SendPacketUhli.data[1] = 0x1F;
     SendPacketUhli.data[2] = 0x01;
@@ -940,8 +959,10 @@ void writeCV (unsigned int adr, unsigned int data, byte stepPrg) {
   //DEBUG_MSG("Write CV%d = %d", adr, data);
 }
 
+
 #ifdef USE_PRG_UHLI
 void progUhli (byte mode) {
+  ulhiProg = mode;
   if (typeCmdStation == CMD_DR) {                           // Intellibox II program task start or end
     SendPacket.data[0] = OPC_PEER_XFER;
     SendPacket.data[1] = 0x07;
@@ -1343,6 +1364,7 @@ void sendLNCV (byte id, byte flags) {
   0xE7, 0x0E, 0x00, 0x02, 0x42, 0x03, 0x00, 0x07, 0x00, 0x00, 0x15, 0x49, 0x42, 0x4C  "Intellibox II / IB-Basic / IB-Com"     ADR: 'B'  ID: 'IB'  SPD: 3
   0xE7, 0x0E, 0x00, 0x02, 0x42, 0x03, 0x00, 0x06, 0x00, 0x00, 0x15, 0x49, 0x42, 0x4D  "System Control 7"                      ADR: 'B'  ID: 'IB'  SPD: 3
   0xE7, 0x0E, 0x00, 0x02, 0x42, 0x03, 0x00, 0x07, 0x00, 0x00, 0x15, 0x49, 0x42, 0x4C  "Daisy II Tillig"                       ADR: 'B'  ID: 'IB'  SPD: 3
+  0xE7, 0x0E, 0x00, 0x02, 0x42, 0x03, 0x00, 0x07, 0x00, 0x00, 0x15, 0x49, 0x42, 0x4C  "Daisy II WLAN"                         ADR: 'B'  ID: 'IB'  SPD: 3
   0xE7, 0x0E, 0x00, 0x00, 0x44, 0x02, 0x00, 0x07, 0x00, 0x59, 0x01, 0x49, 0x42, 0x04  "Daisy"                                 ADR: 'DY' ID: 'IB'  SPD: 2
   0xE7, 0x0E, 0x00, 0x00, 0x4C, 0x01, 0x00, 0x07, 0x00, 0x49, 0x02, 0x49, 0x42, 0x1C  "Adapter 63820"                         ADR: 'LI' ID: 'IB'  SPD: 1
   0xE7, 0x0E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x5A, 0x21, 0x6A  "Z21 Black"                             ADR: 0    ID: 'Z'21 SPD: 0
@@ -1372,6 +1394,8 @@ void sendLNCV (byte id, byte flags) {
                IB2:  E5 0F 00 49 4B 08 00 26 10 01 01 01 00 00 28 -> v1.025 - 1.026
              Daisy:  E5 0F 00 49 4B 08 00 02 10 00 00 00 00 00 0D -> 1002 (LNCV 90)
             RB1110:  B4 7D 7F 49                                  -> not supported
+     Daisy II WLAN:  E5 0F 00 49 4B 08 00 08 10 00 00 00 00 00 07 -> 1008 (Art. 6521 LNCV90)
+
 
 
      Serial number:  ED 0F 01 49 42 07 00 00 00 00 00 00 00 00 10
@@ -1381,6 +1405,7 @@ void sendLNCV (byte id, byte flags) {
                IB2:  E5 0F 00 49 4B 09 00 12 00 01 60 60 00 00 0D -> 1200016060
              Daisy:  E5 0F 00 49 4B 09 00 13 00 00 06 05 00 00 0E ->
             RB1110:  B4 7D 7F 49                                  -> not supported
+     Daisy II WLAN:  E5 0F 00 49 4B 09 00 13 00 00 21 43 00 00 6F -> UB_WLAN_15544468 (Update ED498CD4) -> MAC: D4-8C-49-ED-30-95 -> 0xED3095 - 1 = 15544468
 
 */
 

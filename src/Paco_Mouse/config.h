@@ -6,7 +6,7 @@
 // ***** USER OPTIONS *****
 ////////////////////////////////////////////////////////////
 
-// Seleccione el idioma de los menus - Select menu language: ENGLISH/SPANISH/CATALAN/PORTUGUESE/GERMAN/FRENCH/ITALIAN/NEDERLANDS
+// Seleccione el idioma de los menus - Select menu language: ENGLISH/SPANISH/CATALAN/PORTUGUESE/GERMAN/FRENCH/ITALIAN/NEDERLANDS/CZECH
 #define LANGUAGE                  SPANISH
 
 
@@ -15,7 +15,7 @@
 
 
 // Seleccione el chip controlador del display 128x64 OLED - Select the 128x64 OLED display controller chip:  SSD1306/SH1106/SSD1309
-#define OLED_CHIP                 SSD1309
+#define OLED_CHIP                 SSD1306
 
 
 // Direccion I2C del display OLED - I2C address of the OLED display (OLED I2C address - 0x3D: Adafruit I2C OLED, 0x3C: Clone I2C OLED)
@@ -32,6 +32,10 @@
 
 // Descomentar la siguiente linea si se usa el touchpad TTP229 por detras - Uncomment next line if using rear side of touchpad TTP229
 #define REAR_TOUCH                1
+
+
+// Selecion tipo cambio direccion - Select change direction type: BUTTON_ENC/SWITCH_3P
+#define CHANGE_DIR                BUTTON_ENC
 
 
 // Mostrar pasos de velocidad - Show speed steps: LEFT/RIGHT/NONE
@@ -93,7 +97,7 @@
 
 
 #if  (HW_VERSION == XNET)  
-#define USE_XPRESSNET             1                           // Xpressnet  - Arduino Nano
+#define USE_XPRESSNET             1                           // Xpressnet  - Arduino Nano & ESP8266 Wemos D1 mini
 #endif
 #if  (HW_VERSION == LNET) 
 #define USE_LOCONET               1                           // Loconet    - Arduino Nano & ESP8266 Wemos D1 mini
@@ -137,7 +141,7 @@
 #define USE_LNWIRE
 #define USE_PHONE
 #define USE_LNCV
-//#define USE_PRG_UHLI
+#define USE_PRG_UHLI
 #define USE_DECODE_IMM
 #endif
 #if defined(ESP8266)
@@ -253,7 +257,7 @@
     D12       Encoder
     D13 LED
     A0        Teclado columna 4 (opcion USE_KEYPAD_4x4)
-    A1
+    A1        Analogico. Interruptor direccion
     A2        Encoder. Pulsador
     A3        Xpressnet TXRX
     A4  SDA   OLED SSD1306 (NO CAMBIAR)
@@ -288,6 +292,8 @@ const int pinLN_RXD     = 8;                                  // Loconet pins. N
 const int pinLN_TXD     = 7;
 
 const int pinTXRX       = A3;                                 // Xpressnet pins
+
+const int pinCHG_DIR    = A1;                                 // only for change direction using switch 3P
 
 const int pinTOUCH_SCL  = 10;                                 // TTP229 keypad pins
 const int pinTOUCH_SDO  = 9;
@@ -335,6 +341,8 @@ const int pinCOLUMNA4   = 0;
 
 const int pinSDA        = D2;                                 // I2C pins: OLED. NO CAMBIAR
 const int pinSCL        = D1;
+
+const int pinCHG_DIR    = A0;                                 // only for change direction using switch 3P
 
 const int pinTOUCH_SCL  = D3;                                 // TTP229 keypad pins
 const int pinTOUCH_SDO  = D4;

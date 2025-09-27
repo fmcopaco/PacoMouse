@@ -34,7 +34,7 @@ const char cfgMsg[][15] PROGMEM = {
   "Digitrax",
 #endif
 #ifdef USE_XNWIRE
-  "DIR. XPRESSNET",
+  "XPRESSNET ADR.",
   "",
 #endif
 #if defined(USE_Z21) || defined(USE_ECOS) || defined(USE_LNWIFI) || defined(USE_XNWIFI)

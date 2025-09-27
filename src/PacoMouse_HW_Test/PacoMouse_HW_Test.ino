@@ -1,18 +1,24 @@
-/*    Paco Mouse -- F. Cañada 2022-2024 -- https://usuaris.tinet.cat/fmco/
+/*    Paco Mouse -- F. Cañada 2022-2025 -- https://usuaris.tinet.cat/fmco/
 
-      Test de hardware para placa PacoMouse con Arduino Nano
+      Test de hardware para placa PacoMouse con Arduino Nano & ESP8266 Wemos D1 mini
 
+      PacoMouse v0.30
 */
 
-#define KEYPAD        0                                     // Tipo de teclado, normal o tactil
+#define KEYPAD        0                                     // Tipo de teclado, normal o tactil - Type of keypad, normal or touchpad
 #define TOUCHPAD      1
 
+#define ENGLISH       0                                     // Idioma de este programa de prueba - Language of this test program
+#define SPANISH       1
 
 ////////////////////////////////////////////////////////////
 // ***** USER OPTIONS *****
 ////////////////////////////////////////////////////////////
 
 #define SERIAL_SPEED 115200
+
+// Seleccione el idioma de los menus - Select menu language: ENGLISH/SPANISH
+#define LANGUAGE                  SPANISH
 
 // Seleccione el tipo de teclado - Select the type of keypad: KEYPAD/TOUCHPAD
 #define KEYPAD_TYPE               KEYPAD
@@ -26,6 +32,17 @@
 ////////////////////////////////////////////////////////////
 // ***** END OF USER OPTIONS *****
 ////////////////////////////////////////////////////////////
+
+#if (LANGUAGE == ENGLISH)
+#define PRINT_ENG(x) Serial.print(x);
+#else
+#define PRINT_ENG(x)
+#endif
+#if (LANGUAGE == SPANISH)
+#define PRINT_SPA(x) Serial.print(x);
+#else
+#define PRINT_SPA(x)
+#endif
 
 
 #if defined(__AVR__)
@@ -79,6 +96,8 @@ const int pinLN_TXD     = 7;
 
 const int pinTXRX       = A3;                                 // Xpressnet pins
 
+const int pinCHG_DIR    = A1;                                 // only for change direction using switch 3P
+
 const int pinTOUCH_SCL  = 10;                                 // TTP229 keypad pins
 const int pinTOUCH_SDO  = 9;
 const int pinTOUCH_VCC  = A0;                                 // only for PacoMouse board
@@ -106,6 +125,8 @@ const int pinCOLUMNA4   = 0;
 const int pinSDA        = D2;                                 // I2C pins: OLED. NO CAMBIAR
 const int pinSCL        = D1;
 
+const int pinCHG_DIR    = A0;                                 // only for change direction using switch 3P
+
 const int pinTOUCH_SCL  = D3;                                 // TTP229 keypad pins
 const int pinTOUCH_SDO  = D4;
 
@@ -123,6 +144,8 @@ bool isSSD1309;
 byte adrPCF8574;
 bool isKeypad;
 bool poweredTouch;
+bool isDirSwitch;
+bool dirSwitchOK;
 
 // Initialization commands for a 128x64 SSD1309 oled display.
 static const uint8_t MEM_TYPE SSD1309_128x64init[] = {
@@ -282,7 +305,8 @@ byte i2cTest(byte address) {
 
 bool buscaOLED() {
   printSeparator();
-  Serial.println(F("Buscando OLED..."));
+  PRINT_SPA(F("Buscando OLED...\n"))
+  PRINT_ENG(F("Searching OLED...\n"))
   i2cAdr = 0x3C;
   if (i2cTest(i2cAdr) == 0) {
     return true;
@@ -306,8 +330,10 @@ void buscaI2C() {
       devices++;
     }
   }
-  if (devices == 0)
-    Serial.println(F("No se han encontrado dispositivos I2C"));
+  if (devices == 0) {
+    PRINT_SPA(F("No se han encontrado dispositivos I2C\n"))
+    PRINT_ENG(F("I2C devices not found\n"))
+  }
   Serial.println();
 }
 
@@ -315,7 +341,8 @@ void buscaI2C() {
 bool buscaKeypad() {
   byte adr, error;
   printSeparator();
-  Serial.println(F("Buscando PCF8574..."));
+  PRINT_SPA(F("Buscando PCF8574...\n"))
+  PRINT_ENG(F("Searching PCF8574...\n"))
   adrPCF8574 = I2C_ADDRESS_KEYPAD;
   if (i2cTest(adrPCF8574) == 0) {
     return true;
@@ -482,7 +509,8 @@ void testSwitch() {
       if (isOLED) {
         oled.setCursor(60, 0);
         if (statusSwitch == LOW) {
-          Serial.println(F("Pulsado"));
+          PRINT_SPA(F("Pulsado\n"))
+          PRINT_ENG(F("Pressed\n"))
           oled.print('0');
         }
         else {
@@ -490,8 +518,42 @@ void testSwitch() {
         }
       }
       else  {
-        if (statusSwitch == LOW)
-          Serial.println(F("Pulsado"));
+        if (statusSwitch == LOW) {
+          PRINT_SPA(F("Pulsado\n"))
+          PRINT_ENG(F("Pressed\n"))
+        }
+      }
+    }
+  }
+}
+
+
+void testDirSwitch() {
+  byte inputButton, txt;
+#if defined(ESP8266)
+  yield();
+#endif
+  if (millis() - timeButtons > timeoutButtons)  {            // lectura de boton
+    timeButtons = millis();                                   // lee cada cierto tiempo
+    inputButton = map(analogRead(pinCHG_DIR), 0, 1024, 0, 3);
+    if (statusSwitch != inputButton) {
+      statusSwitch = inputButton;
+      switch (inputButton) {
+        case 0:
+          txt = 14;
+          break;
+        case 1:
+          txt = 12;
+          break;
+        case 2:
+          txt = 15;
+          break;
+      }
+      Serial.println(keyText[txt]);
+      if (isOLED) {
+        oled.setCursor(20, 6);
+        oled.print(keyText[txt]);
+        oled.print("    ");
       }
     }
   }
@@ -520,15 +582,22 @@ void formatDisk() {
 // ---------------------------------------------------------------------------------------------------
 
 void instrucciones() {
-  Serial.println(F("\nSiga los siguientes pasos para comprobar el hardware de la placa PacoMouse"));
-  Serial.println(F("Se comprobaran el OLED, el teclado y el encoder\n"));
+  PRINT_SPA(F("\nSiga los siguientes pasos para comprobar el hardware de la placa PacoMouse\n"))
+  PRINT_SPA(F("Se comprobaran el OLED, el teclado y el encoder\n\n"))
+  PRINT_ENG(F("\nFollow the next steps to check the hardware of PacoMouse\n"))
+  PRINT_ENG(F("We will check the OLED, keyboard and encoder\n\n"))
 #if defined(__AVR__)
-  Serial.println(F("ATENCION: No conecte el Arduino al bus Loconet o al Xpressnet"));
-  Serial.println(F("ATENCION: En caso de usar la version Xpressnet, no instale el MAX485\n"));
+  PRINT_SPA(F("ATENCION: No conecte el Arduino al bus Loconet o al Xpressnet\n"))
+  PRINT_SPA(F("ATENCION: En caso de usar la version Xpressnet, no instale el MAX485\n\n"))
+  PRINT_ENG(F("WARNING: Don't connect Arduino to Loconet or Xpressnet bus\n"))
+  PRINT_ENG(F("WARNING: In case of Xpressnet version, don't install the MAX485\n\n"))
 #endif
-  Serial.println(F("Si es necesario repita este test añadiendo un elemento cada vez"));
-  Serial.println(F("Responda a las preguntas desde el Monitor Serie del Arduino IDE\n"));
-  Serial.println(F(">> Escriba Y cuando este listo\n"));
+  PRINT_SPA(F("Si es necesario repita este test añadiendo un elemento cada vez\n"))
+  PRINT_SPA(F("Responda a las preguntas desde el Monitor Serie del Arduino IDE\n\n"))
+  PRINT_SPA(F(">> Escriba Y cuando este listo\n\n"))
+  PRINT_ENG(F("If necessary repeat this test adding one element each time\n"))
+  PRINT_ENG(F("Answer the questions from the Serial Monitor of Arduino IDE\n\n"))
+  PRINT_ENG(F(">> Type Y when you are ready\n\n"))
 }
 
 
@@ -566,8 +635,10 @@ void showTestOLED(bool ask) {
   oled.set1X();
   oled.setCursor (42, 5);
   oled.print(F("Mouse"));
-  if (ask)
-    Serial.println(F("Ve correctamente  el recuadro y el texto en pantalla sin desplazamientos? (Y/N)"));
+  if (ask) {
+    PRINT_SPA(F("Ve correctamente  el recuadro y el texto en pantalla sin desplazamientos? (Y/N)\n"))
+    PRINT_ENG(F("Do you see the box and text correctly on the screen without offsets? (Y/N)\n"))
+  }
 }
 
 void printComment(bool prn) {
@@ -584,11 +655,13 @@ void printTypeOLED () {
       Serial.println(F("SH1106       // OLED 1.3\""));
     if (isSSD1309) {
       Serial.println(F("SSD1309      // OLED 1.54\" & 2.42\""));
-      Serial.println(F("\nATENCION: Su pantalla consume mucha corriente, tengalo en cuenta!!\n"));
+      PRINT_SPA(F("\nATENCION: Su pantalla consume mucha corriente, tengalo en cuenta!!\n\n"))
+      PRINT_ENG(F("\nWARNING: Your screen consumes a lot of power, keep this in mind!!\n\n"))
     }
   }
   else {
-    Serial.println(F("ERROR: Compruebe las conexiones de su pantalla. Si son correctas su OLED no esta soportada"));
+    PRINT_SPA(F("ERROR: Compruebe las conexiones de su pantalla. Si son correctas su OLED no esta soportada\n"))
+    PRINT_ENG(F("ERROR: Check your display connections. If they are correct, your OLED is not supported.\n"))
   }
 }
 
@@ -597,16 +670,22 @@ void printResumen() {
   if (isOLED)
     showTestOLED(false);
   printSeparator();
-  Serial.println(F("\nFIN DEL TEST"));
-  Serial.print(F("\n\nEn el archivo config.h de PacoMouse use: \n\n"));
-  if (!encoderOK)
-    Serial.println(F("\n\nERROR: Compruebe conexiones del encoder!!. Si cambian los valores al reves intercambie los cables S1 y S2\n"));
+  PRINT_SPA(F("\nFIN DEL TEST\n"))
+  PRINT_ENG(F("\nEND OF TEST\n"))
+  PRINT_SPA(F("\n\nEn el archivo config.h de PacoMouse use:\n\n"))
+  PRINT_ENG(F("\n\nIn the PacoMouse config.h file use:\n\n"))
+  if (!encoderOK) {
+    PRINT_SPA(F("\n\nERROR: Compruebe conexiones del encoder!!. Si cambian los valores al reves intercambie los cables S1 y S2\n\n"))
+    PRINT_ENG(F("\n\nERROR: Check encoder connections!! If the values ​​change backwards, swap cables S1 and S2.\n\n"))
+  }
   switch (numTeclas) {
     case 0:
 #if (KEYPAD_TYPE == TOUCHPAD)
-      Serial.println(F("\nERROR: Compruebe las conexiones del TTP229 y la linea '#define REAR_TOUCH' de este programa!!"));
+      PRINT_SPA(F("\nERROR: Compruebe las conexiones del TTP229 y la linea '#define REAR_TOUCH' de este programa!!\n"))
+      PRINT_ENG(F("\nERROR: Check the connections of TTP229 and the line '#define REAR_TOUCH' de este programa!!\n"))
 #else
-      Serial.println(F("ERROR: Compruebe las conexiones de su teclado!!"));
+      PRINT_SPA(F("ERROR: Compruebe las conexiones de su teclado!!\n"))
+      PRINT_ENG(F("ERROR: Check your keyboard connections!!\n"))
 #endif
       break;
     case 12:
@@ -631,7 +710,8 @@ void printResumen() {
     printTypeOLED();
   }
   else {
-    Serial.println(F("ERROR: Compruebe las conexiones de su pantalla OLED"));
+    PRINT_SPA(F("ERROR: Compruebe las conexiones de su pantalla OLED!!\n"))
+    PRINT_ENG(F("ERROR: Check your OLED display connections!!\n"))
   }
   Serial.println();
   Serial.print(F("#define HW_VERSION                "));
@@ -643,8 +723,10 @@ void printResumen() {
     Serial.println(F("Z21"));
   if (useECOS)
     Serial.println(F("ECOS"));
-  if (errorLN)
-    Serial.println(F("\nERROR: Compruebe las conexiones del interface Loconet de PacoMouse!!. No responde adecuadamente!!"));
+  if (errorLN) {
+    PRINT_SPA(F("\nERROR: Compruebe las conexiones del interface Loconet de PacoMouse!!. No responde adecuadamente!!\n"))
+    PRINT_ENG(F("\nERROR: Check the connections on the PacoMouse Loconet interface. It's not responding properly!\n"))
+  }
 
   Serial.println();
   Serial.print(F("#define KEYPAD_TYPE               "));
@@ -667,19 +749,34 @@ void printResumen() {
     Serial.println();
   }
   else {
-    Serial.println(F("\nERROR: Compruebe las conexiones del PCF8574 y la linea '#define I2C_ADDRESS_KEYPAD' de este programa!!"));
+    PRINT_SPA(F("\nERROR: Compruebe las conexiones del PCF8574 y la linea '#define I2C_ADDRESS_KEYPAD' de este programa!!\n"))
+    PRINT_ENG(F("\nERROR: ERROR: Check the PCF8574 connections and the '#define I2C_ADDRESS_KEYPAD' line in this program!!!\n"))
   }
 #endif
 #endif
 
+  Serial.print(F("\n#define CHANGE_DIR                "));
+  if (isDirSwitch) {
+    Serial.println(F("SWITCH_3P\n"));
+    if (! dirSwitchOK) {
+      PRINT_SPA(F("Compruebe las conexiones de su interruptor de direccion y sus resistencias\n\n"))
+      PRINT_ENG(F("Check your direction switch connections and resistors\n\n"))
+    }
+  }
+  else
+    Serial.println(F("BUTTON_ENC\n"));
+
   if (useECOS) {
-    Serial.println(F("\nDefina para el stack un numero mayor que las locomotoras que tiene definidas en la central. p.ej 80"));
+    PRINT_SPA(F("\nDefina para el stack un numero mayor que las locomotoras que tiene definidas en la central. p.ej 80\n"))
+    PRINT_ENG(F("\nDefine a number for the stack that is greater than the number of locomotives you have defined in the command station. e.g., 80.\n"))
     Serial.println(F("\n#define LOCOS_IN_STACK            80"));
   }
   else {
-    Serial.println(F("\nDefina para el stack un numero comodo para seleccionar de la lista. p.ej 24"));
+    PRINT_SPA(F("\nDefina para el stack un numero comodo para seleccionar de la lista. p.ej 24\n"))
+    PRINT_ENG(F("\nDefine a convenient number for the stack to select from the list. e.g., 24.\n"))
     Serial.println(F("\n#define LOCOS_IN_STACK            24"));
   }
+
 }
 
 
@@ -714,10 +811,10 @@ void setup() {
   Serial.begin(SERIAL_SPEED);
   Serial.print(F("\n\nPacoMouse Hardware Test "));
 #if defined(__AVR__)
-  Serial.println(F("con Arduino Nano"));
+  Serial.println(F("- Arduino Nano"));
 #endif
 #if defined(ESP8266)
-  Serial.println(F("con Wemos D1 Mini"));
+  Serial.println(F("- Wemos D1 Mini"));
 #endif
   instrucciones();
   getResponse("Yy");
@@ -732,11 +829,13 @@ void setup() {
 #endif
   isOLED = buscaOLED();
   if (isOLED) {
-    Serial.print(F("OLED encontrado con la direccion I2C: 0x"));
+    PRINT_SPA(F("OLED encontrado con la direccion I2C: 0x"))
+    PRINT_ENG(F("OLED found with I2C address: 0x"))
     Serial.println(i2cAdr, HEX);
   }
   else {
-    Serial.println(F("ERROR: OLED no encontrado!!\n\nBuscando otros dispositivos en el bus I2C: "));
+    PRINT_SPA(F("ERROR: OLED no encontrado!!\n\nBuscando otros dispositivos en el bus I2C:\n"))
+    PRINT_ENG(F("ERROR: OLED not found!!\n\nLooking for other devices on the I2C bus:\n"))
     buscaI2C();
   }
   Serial.println();
@@ -747,7 +846,8 @@ void setup() {
     oled.begin(&Adafruit128x64, i2cAdr);
     showTestOLED(true);
     if (getResponse("YyNn") == 'Y') {
-      Serial.println(F("Usa una pantalla grande de 1.54\" o 2.42\" con el SSD1309? (Y/N)"));
+      PRINT_SPA(F("Usa una pantalla grande de 1.54\" o 2.42\" con el SSD1309? (Y/N)\n"))
+      PRINT_ENG(F("Are you using a large 1.54\" or 2.42\" screen with the SSD1309? (Y/N)\n"))
       if (getResponse("YyNn") == 'N') {
         isSSD1306 = true;
       }
@@ -773,7 +873,8 @@ void setup() {
 #if (KEYPAD_TYPE == TOUCHPAD)
   numTeclas = 16;
 #if defined(__AVR__)
-  Serial.println(F("Alimenta el TTP229 desde los pines del teclado de la placa PacoMouse? (Y/N)"));
+  PRINT_SPA(F("Alimenta el TTP229 desde los pines del teclado de la placa PacoMouse? (Y/N)\n"))
+  PRINT_ENG(F("Is the TTP229 powered from the keyboard pins on the PacoMouse board? (Y/N)\n"))
   if (getResponse("YyNn") == 'Y') {
     poweredTouch = true;
     pinMode(pinTOUCH_GND, OUTPUT);
@@ -791,24 +892,29 @@ void setup() {
 #if defined(ESP8266)
   isKeypad = buscaKeypad();
   if (isKeypad) {
-    Serial.print(F("Keypad encontrado en la direccion I2C: "));
+    PRINT_SPA(F("Keypad encontrado en la direccion I2C: "))
+    PRINT_ENG(F("Keypad found at I2C address: "))
     printHEX(adrPCF8574);
     Serial.println();
     keypad.begin();
   }
   else {
     if (adrPCF8574 > 0) {
-      Serial.print(F("ERROR: Keypad no encontrado en la direccion I2C: "));
+      PRINT_SPA(F("ERROR: Keypad no encontrado en la direccion I2C: "))
+      PRINT_ENG(F("ERROR: Keypad not found at I2C address: "))
       printHEX(I2C_ADDRESS_KEYPAD);
-      Serial.print(F("\n\nLocalizado posible Keypad en la direccion I2C: "));
+      PRINT_SPA(F("\n\nLocalizado posible Keypad en la direccion I2C: "))
+      PRINT_ENG(F("\n\nPossible Keypad located at I2C address: "))
       printHEX(adrPCF8574);
-      Serial.println(F("\n\nModifique esta linea en este programa y vuelva a subirlo al Arduino:"));
+      PRINT_SPA(F("\n\nModifique esta linea en este programa y vuelva a subirlo al Arduino:\n"))
+      PRINT_ENG(F("\n\nModify this line in this program and upload it back to the Arduino:\n"))
       Serial.print(F("#define I2C_ADDRESS_KEYPAD       "));
       printHEX(adrPCF8574);
       Serial.println();
     }
     else {
-      Serial.println(F("ERROR: Keypad no encontrado!!\n\nBuscando otros dispositivos en el bus I2C:"));
+      PRINT_SPA(F("ERROR: Keypad no encontrado!!\n\nBuscando otros dispositivos en el bus I2C:\n"))
+      PRINT_ENG(F("ERROR: Keypad not found!!\n\nSearching for other devices on the I2C bus:\n"))
       buscaI2C();
     }
   }
@@ -816,19 +922,25 @@ void setup() {
 #endif
   printSeparator();
   keypad.setDebounceTime(20);
-  Serial.println(F("Usa un teclado 4x4? (Y/N)"));
+  PRINT_SPA(F("Usa un teclado 4x4? (Y/N)\n"))
+  PRINT_ENG(F("Do you use a 4x4 keyboard? (Y/N)\n"))
   numTeclas = (getResponse("YyNn") == 'Y') ? 16 : 12;
 
 #endif
-  Serial.println(F("Desea comprobar el teclado ahora? (Y/N)"));
+  PRINT_SPA(F("Desea comprobar el teclado ahora? (Y/N)\n"))
+  PRINT_ENG(F("Do you want to check the keyboard now? (Y/N)\n"))
   if (getResponse("YyNn") == 'Y') {
-    Serial.print(F("Pulse una a una las "));
+    PRINT_SPA(F("Pulse una a una las "))
+    PRINT_ENG(F("Press the "))
     Serial.print(numTeclas);
-    Serial.println(F(" teclas y compruebe que corresponde con su posicion"));
+    PRINT_SPA(F(" teclas y compruebe que corresponde con su posicion\n"))
+    PRINT_ENG(F(" keys one by one and check that they correspond to to their positions.\n"))
     testedTeclas = testKeypad();
-    Serial.print(F("\nHa pulsado "));
+    PRINT_SPA(F("\nHa pulsado "))
+    PRINT_ENG(F("\nYou have pressed "))
     Serial.print(testedTeclas);
-    Serial.println(F(" teclas diferentes.\n\nCorresponden todas las teclas con su posicion? (Y/N)"));
+    PRINT_SPA(F(" teclas diferentes.\n\nCorresponden todas las teclas con su posicion? (Y/N)\n"))
+    PRINT_ENG(F(" different keys.\n\nDo all the keys correspond to their position? (Y/N)\n"))
     if (getResponse("YyNn") == 'N')
       numTeclas = 0;
   }
@@ -842,8 +954,10 @@ void setup() {
 #if defined(__AVR__)
   pciSetup(pinOutA);
 #endif
-  Serial.println(F("Mueva el encoder durante 10s y compruebe que varian los valores"));
-  Serial.println(F("Pulse Y cuando este listo."));
+  PRINT_SPA(F("Mueva el encoder durante 10s y compruebe que varian los valores\n"))
+  PRINT_SPA(F("Pulse Y cuando este listo.\n"))
+  PRINT_ENG(F("Move the encoder for 10 seconds and check that the values ​​change.\n"))
+  PRINT_ENG(F("Type Y when you're ready.\n"))
   getResponse("Yy");
   encoderValue = 64;
   encoderMax = 127;
@@ -853,20 +967,45 @@ void setup() {
     oled.clear();
   while (millis() - timeout < 10000UL)
     testEncoder();
-  Serial.println(F("Los valores han variado segun el movimiento del encoder? (Y/N)"));
+  PRINT_SPA(F("Los valores han variado segun el movimiento del encoder? (Y/N)\n"))
+  PRINT_ENG(F("Have the values ​​changed depending on the movement of the encoder? (Y/N)\n"))
   if (getResponse("YyNn") == 'N')
     encoderOK = false;
 
   printSeparator();
-  Serial.println(F("Pulse el boton del encoder repetidamente durante 5s y compruebe su funcionamiento"));
-  Serial.println(F("Pulse Y cuando este listo."));
+  PRINT_SPA(F("Pulse el boton del encoder repetidamente durante 5s y compruebe su funcionamiento\n"))
+  PRINT_SPA(F("Pulse Y cuando este listo.\n"))
+  PRINT_ENG(F("Press the encoder button repeatedly for 5s and check its operation.\n"))
+  PRINT_ENG(F("Type Y when you're ready.\n"))
   getResponse("Yy");
   timeout = millis();
   while (millis() - timeout < 5000UL)
     testSwitch();
-  Serial.println(F("Se ha detectado la pulsacion del boton del encoder? (Y/N)"));
+  PRINT_SPA(F("Se ha detectado la pulsacion del boton del encoder? (Y/N)\n"))
+  PRINT_ENG(F("Has the encoder button press been detected? (Y/N)\n"))
   if (getResponse("YyNn") == 'N')
     encoderOK = false;
+
+  printSeparator();
+  isDirSwitch = false;
+  PRINT_SPA(F("Usa interruptor para cambio direccion? (Y/N)\n"))
+  PRINT_ENG(F("Do you use a switch to change direction? (Y/N)\n"))
+  if (getResponse("YyNn") == 'Y') {
+    isDirSwitch = true;
+    dirSwitchOK = true;
+    PRINT_SPA(F("Mueva el interruptor a todas las posiciones durante 10s y compruebe su funcionamiento\n"))
+    PRINT_SPA(F("Pulse Y cuando este listo.\n"))
+    PRINT_ENG(F("Move the switch to all positions for 10s and check its operation.\n"))
+    PRINT_ENG(F("Type Y when you're ready.\n"))
+    getResponse("Yy");
+    timeout = millis();
+    while (millis() - timeout < 10000UL)
+      testDirSwitch();
+    PRINT_SPA(F("Se ha detectado la posicion del interruptor correctamente? (Y/N)\n"))
+    PRINT_ENG(F("Has the switch position been detected correctly? (Y/N)\n"))
+    if (getResponse("YyNn") == 'N')
+      dirSwitchOK = false;
+  }
 
   printSeparator();
   errorLN = false;
@@ -875,11 +1014,13 @@ void setup() {
   useZ21 = false;
   useECOS = false;
 #if defined(ESP8266)
-  Serial.println(F("Usa la version ECoS de PacoMouse? (Y/N)"));
+  PRINT_SPA(F("Usa la version ECoS de PacoMouse? (Y/N)\n"))
+  PRINT_ENG(F("Are you using the ECoS version of PacoMouse? (Y/N)\n"))
   if (getResponse("YyNn") == 'Y')
     useECOS = true;
   else {
-    Serial.println(F("Usa la version Z21 de PacoMouse? (Y/N)"));
+    PRINT_SPA(F("Usa la version Z21 de PacoMouse? (Y/N)\n"))
+    PRINT_ENG(F("Are you using the Z21 version of PacoMouse? (Y/N)\n"))
     if (getResponse("YyNn") == 'Y')
       useZ21 = true;
     else
@@ -887,7 +1028,8 @@ void setup() {
   }
 #endif
 #if defined(__AVR__)
-  Serial.println(F("Usa la version Loconet de PacoMouse? (Y/N)"));
+  PRINT_SPA(F("Usa la version Loconet de PacoMouse? (Y/N)\n"))
+  PRINT_ENG(F("Are you using the Loconet version of PacoMouse? (Y/N)\n"))
   if (getResponse("YyNn") == 'Y') {
     useLN = true;
     /*
@@ -913,12 +1055,14 @@ void setup() {
   }
 #endif
 
-  Serial.println(F("Desea restaturar la EEPROM a los valores por defecto? (Y/N)"));
+  PRINT_SPA(F("Desea restaturar la EEPROM a los valores por defecto? (Y/N)\n"))
+  PRINT_ENG(F("Do you want to restore the EEPROM to default values? (Y/N)\n"))
   if (getResponse("YyNn") == 'Y') {
-    Serial.println(F("Esta seguro? (Y/N)"));
+    PRINT_SPA(F("Esta seguro? (Y/N)\n"))
+    PRINT_ENG(F("Are you sure? (Y/N)\n"))
     if (getResponse("YyNn") == 'Y') {
 #if defined(ESP8266)
-      EEPROM.begin(1024);
+      EEPROM.begin(2048);
 #endif
       updateEEPROM(EE_ADRH, 0);                             // Current Loc
       updateEEPROM(EE_ADRL, 3);
@@ -962,7 +1106,8 @@ void setup() {
       EEPROM.put(EE_WIFI, wifiSetting);
       EEPROM.commit();
 #endif
-      Serial.println(F("EEPROM restaurada a valores por defecto"));
+      PRINT_SPA(F("EEPROM restaurada a valores por defecto\n"))
+      PRINT_ENG(F("EEPROM restored to default values\n"))
     }
   }
 

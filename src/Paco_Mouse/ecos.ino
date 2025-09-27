@@ -191,7 +191,7 @@ void infoLocomotora (unsigned int ID) {
   byte n;
   if (ID > 999) {
     bitClear(mySteps, 3);
-    snprintf(cmd, 64, "request(%d, view, control[events])\n", ID);                // View Locomotive data updates
+    snprintf(cmd, 64, "request(%d, view, control[events])\n", ID);        // View Locomotive data updates
     sendMsgECOS(cmd);
     snprintf(cmd, 64, "get(%d, speed, dir, speedstep)\n", ID);            // Speed, dir & steps
     sendMsgECOS(cmd);

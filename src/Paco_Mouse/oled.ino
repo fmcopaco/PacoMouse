@@ -16,8 +16,8 @@
 ////////////////////////////////////////////////////////////
 
 void beginHID() {
-  pinMode (pinSDA, INPUT_PULLUP);                           // HID (Human Interface Device)
-  pinMode (pinSCL, INPUT_PULLUP);
+  pinMode (pinSCL, INPUT_PULLUP);                           // HID (Human Interface Device)
+  pinMode (pinSDA, INPUT_PULLUP);
   pinMode (pinOutA, INPUT_PULLUP);                          // Encoder
   pinMode (pinOutB, INPUT_PULLUP);
   pinMode (pinSwitch, INPUT_PULLUP);
@@ -66,6 +66,11 @@ void showPrgMenu() {                                        // muestra menu de p
   encoderMax = PRG_ITEMS - 1;
   encoderValue = prgOLED;
   updateOLED = true;
+#ifdef USE_LOCONET
+  lnetProg = false;
+  if (!bitRead(mySlot.trk, 0))
+    showEmergencyOff();
+#endif
 #ifdef USE_XPRESSNET
   if (csStatus & csServiceMode)
     resumeOperations();
@@ -133,7 +138,7 @@ void showOLED() {
 #endif
       oled.setCursor (83, 0);
       oled.setFont(Sym_44x64);
-      oled.print(F("+"));
+      oled.print('+');
       oled.setInvertMode(false);
       scrOLED = SCR_ENDLOGO;
       timeoutOLED = 3000;
@@ -385,30 +390,37 @@ void showOLED() {
 #endif
       oled.setFont(Num_15x31);                              // direccion
       oled.setCursor (112, 0);
-#ifdef USE_LOCONET
-      if (myDir & 0x80)
-        oled.print (F("<"));                                // forward
+#if (CHANGE_DIR == SWITCH_3P)
+      if (dirValue == 1)
+        oled.print (';');                                   // stopped
       else
-        oled.print (F(">"));                                // reverse
+#endif
+      {
+#ifdef USE_LOCONET
+        if (myDir & 0x80)
+          oled.print ('<');                                 // forward
+        else
+          oled.print ('>');                                 // reverse
 #endif
 #ifdef USE_XPRESSNET
-      if (myDir & 0x80)
-        oled.print (F(">"));                                // forward
-      else
-        oled.print (F("<"));                                // reverse
+        if (myDir & 0x80)
+          oled.print ('>');                                 // forward
+        else
+          oled.print ('<');                                 // reverse
 #endif
 #ifdef USE_Z21
-      if (myDir & 0x80)
-        oled.print (F(">"));                                // forward
-      else
-        oled.print (F("<"));                                // reverse
+        if (myDir & 0x80)
+          oled.print ('>');                                 // forward
+        else
+          oled.print ('<');                                 // reverse
 #endif
 #ifdef USE_ECOS
-      if (myDir & 0x80)
-        oled.print (F(">"));                                // forward
-      else
-        oled.print (F("<"));                                // reverse
+        if (myDir & 0x80)
+          oled.print ('>');                                 // forward
+        else
+          oled.print ('<');                                 // reverse
 #endif
+      }
       printFunctions();                                     // funciones
       timeoutOLED = ONE_DAY;
       break;
@@ -1009,7 +1021,7 @@ void showOLED() {
       }
       oled.setCursor (4, (encoderValue << 1));
       oled.setFont(Sym_16x16);
-      oled.print (F("0"));
+      oled.print ('0');
       timeoutOLED = ONE_DAY;
       break;
     case SCR_PHONE_NUM:
@@ -1426,7 +1438,7 @@ byte calcBarSpeed(byte encoder) {                           // calcula barra par
 #ifdef USE_LOCONET
   byte steps;
 
-  steps =   stepsLN[mySlot.state & 0x07];
+  steps = getMaxStepLnet();
   if (steps == 128) {
     return encoder;                                         // 0..63
   }
@@ -1512,9 +1524,9 @@ void printFunctions() {
 
 void printFuncButton (byte numFunc) {
   if (myFunc.Bits & bit(numFunc))                           // Estado funcion
-    oled.print (F("+"));
+    oled.print ('+');
   else
-    oled.print (F("-"));
+    oled.print ('-');
 }
 #endif
 #if  (FUNC_SIZE == SMALL)
@@ -1534,9 +1546,9 @@ void printFunctions() {
 
 void printFuncButton (byte numFunc) {
   if (myFunc.Bits & bit(numFunc))                           // Estado funcion
-    oled.print (F("+"));
+    oled.print ('+');
   else
-    oled.print (F("-"));
+    oled.print ('-');
 }
 #endif
 

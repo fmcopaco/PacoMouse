@@ -104,7 +104,7 @@ void writeCV (unsigned int adr, unsigned int data, byte stepPrg) {
     askZ21data (adr & 0xFF);
     askZ21data (data);
     askZ21xor ();
-    sendUDP (0x09);
+    sendUDP (0x0A);
     waitResultCV = true;
     lastCV = lowByte(adr);
 

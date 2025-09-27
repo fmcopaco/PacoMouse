@@ -66,6 +66,14 @@ void readButtons () {
     if (statusSwitch == LOW)
       switchOn = true;
   }
+
+#if (CHANGE_DIR == SWITCH_3P)
+  inputButton = readDirSwitch();
+  if (inputButton != dirValue) {
+    dirValue = inputButton;
+    dirChange = true;
+  }
+#endif
 }
 
 
@@ -105,7 +113,10 @@ void controlEncoder() {                                     // encoder movement
     case SCR_TURNTABLE:                                     // Control loco en menu plataforma giratoria
     case SCR_TURNOUT:                                       // Control loco en menu desvios
     case SCR_SPEED:                                         // change speed
-      updateMySpeed();
+#if (CHANGE_DIR == SWITCH_3P)
+      if (dirValue != 1)
+#endif
+        updateMySpeed();
       break;
     case SCR_LOCO:
       if ((encoderValue > 0) && (locoStack[encoderValue] == 0))
@@ -337,6 +348,7 @@ void controlSwitch() {                                      // encoder switch
         locoOperationSpeed();
       }
       else {
+#if (CHANGE_DIR == BUTTON_ENC)
         myDir ^= 0x80;
 #ifdef USE_LOCONET
         changeDirectionF0F4();
@@ -349,6 +361,7 @@ void controlSwitch() {                                      // encoder switch
 #endif
 #ifdef USE_ECOS
         changeDirection();
+#endif
 #endif
       }
       updateOLED = true;
@@ -489,3 +502,47 @@ void controlSwitch() {                                      // encoder switch
 #endif
   }
 }
+
+
+////////////////////////////////////////////////////////////
+// ***** CONTROL DIR SWITCH *****
+////////////////////////////////////////////////////////////
+
+#if (CHANGE_DIR == SWITCH_3P)
+byte readDirSwitch() {
+  return (map(analogRead(pinCHG_DIR), 0, 1024, 0, 3));
+}
+
+void controlDirSwitch() {
+  dirChange = false;
+  encoderValue = 0;
+  if (dirValue == 1) {
+    if (stopMode > 0)
+      mySpeed = 1;
+    else
+      mySpeed = 0;
+    locoOperationSpeed();
+  }
+  else {
+    if (dirValue)
+      myDir |= 0x80;
+    else
+      myDir &= 0x7F;
+#ifdef USE_LOCONET
+    changeDirectionF0F4();
+#endif
+#ifdef USE_XPRESSNET
+    locoOperationSpeed();
+#endif
+#ifdef USE_Z21
+    locoOperationSpeed();
+#endif
+#ifdef USE_ECOS
+    changeDirection();
+#endif
+
+  }
+  updateOLED = true;
+}
+
+#endif

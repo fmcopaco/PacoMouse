@@ -38,11 +38,12 @@
        v0.27    20dec24   Added EEPROM disk. Added Automation. Added CV bits programming. Corrected minor bugs.
        v0.28    26jan25   Using modified and retailed version of Loconet.h library to reduce 0.5K the memory size to support Uhlenbrock programming (30488+678 to 29962+710). Added WiFi version with Loconet over TCP/IP (LBserver & Binary).
        v0.29    18feb25   Added support for Xpressnet WiFi. Added set fast clock option.
+       v0.30    30jun25   Corrected bugs in saving automation, Loconet & Z21. Improved support of SSD1309 OLED and Daisy II WLAN.Added support for direction switch 3 positions: FWD(ON)-(OFF)-(ON)REV. Added Czech language.
 */
 
 // Paco Mouse program version
 #define VER_H "0"
-#define VER_L "29"
+#define VER_L "30"
 
 
 //#define DEBUG                                               // Descomentar para mensajes de depuracion
@@ -55,6 +56,7 @@
 #define FRENCH        6
 #define ITALIAN       7
 #define NEDERLANDS    8
+#define CZECH         9
 
 #define NONE          0                                     // Posicion pasos
 #define LEFT          1
@@ -79,6 +81,8 @@
 #define KEYPAD        0                                     // Tipo de teclado, normal o tactil
 #define TOUCHPAD      1
 
+#define BUTTON_ENC    0                                     // Cambio direccion con boton encoder o conmutador 3 posiciones (ON-OFF-ON)
+#define SWITCH_3P     1
 
 // Libraries
 
@@ -167,7 +171,9 @@
 #if  (LANGUAGE == NEDERLANDS)
 #include "nederlands.h"
 #endif
-
+#if  (LANGUAGE == CZECH)
+#include "czech.h"
+#endif
 
 #ifdef DEBUG
 char output[80];
@@ -236,6 +242,8 @@ Keypad_I2C keypad ( makeKeymap(keys), filaPins, colPins, FILAS, COLUMNAS, I2C_AD
 byte keyValue;                                              // valor tecla pulsada
 bool keyOn;
 
+byte dirValue;                                              // valor interruptor direccion
+bool dirChange;
 
 ////////////////////////////////////////////////////////////
 // ***** ENCODER *****
@@ -487,6 +495,28 @@ unsigned int baseAdrTurntable, baseOffset;
 
 // Initialization commands for a 128x64 SSD1309 oled display.
 static const uint8_t MEM_TYPE SSD1309_128x64init[] = {
+  // Init sequence for SSD1309 128x64 OLED module based on luma.oled initialization
+  SSD1306_DISPLAYOFF,
+  SSD1306_SETDISPLAYCLOCKDIV, 0xF0,  // Set Display Clock Divisor v = 0xF0, default is 0x80
+  SSD1306_SETMULTIPLEX, 0x3F,        // ratio 64
+  SSD1306_SETDISPLAYOFFSET, 0x00,    // no offset
+  SSD1306_SETSTARTLINE,              // line #0
+  //    SSD1306_CHARGEPUMP, 0x14,          // internal vcc
+  SSD1306_MEMORYMODE, 0x00,          // horizontal mode
+  SSD1306_SEGREMAP | 0x01,           // column 127 mapped to SEG0
+  SSD1306_COMSCANDEC,                // column scan direction reversed
+  SSD1306_SETCOMPINS, 0x12,          // alt COM pins, disable remap
+  SSD1306_SETPRECHARGE, 0xF1,        // Set Pre-charge Period
+  SSD1306_SETVCOMDETECT, 0x40,       // vcomh regulator level
+  SSD1306_DISPLAYALLON_RESUME,       // Resume display from GRAM content
+  SSD1306_NORMALDISPLAY,             // Set Normal Display
+  SSD1306_SETCONTRAST, 0x32,         // contrast level (0xCF) 207 by default. Using 0x32 to reduce consumption
+  0x21, 0x00, 0x7F,                  // Set Column Address
+  0x22, 0x00, 0x07,                  // Set Page Address
+  SSD1306_DISPLAYON,
+};
+/*
+  static const uint8_t MEM_TYPE SSD1309_128x64init[] = {
   // Init sequence for SSD1309 128x64 OLED module based on Arduboy2 library initialization & uploader.py lcdBootProgram = b"\xD5\xF0\x8D\x14\xA1\xC8\x81\xCF\xD9\xF1\xAF\x20\x00"
   //                                                                                                 patched for SSD1309= b"\xD5\xF0\xE3\xE3\xA1\xC8\x81\cnt\xD9\xF1\xAF\x20\x00"
   //    SSD1306_DISPLAYOFF,
@@ -507,7 +537,8 @@ static const uint8_t MEM_TYPE SSD1309_128x64init[] = {
   SSD1306_MEMORYMODE, 0x00,
   //    0x21, 0x00, 0x7F,
   //    0x22, 0x00, 0x07
-};
+  };
+*/
 /*
   // Initialization commands for a 128x64 SSD1309 oled display.
   static const uint8_t MEM_TYPE SSD1309_128x64init[] = {
@@ -601,8 +632,10 @@ lnMsg RecvPacket;                                           // Paquete recibido 
 bool isLBServer;
 char rcvStr[10];
 byte rcvStrPos;
-enum rcvPhase {WAIT_TOKEN, RECV_TOKEN, RECV_PARAM};
+enum rcvPhase {WAIT_TOKEN, RECV_TOKEN, RECV_PARAM, SENT_TOKEN, SENT_PARAM};
 byte rcvStrPhase;
+bool sentOK;
+unsigned long timeout;
 
 #endif
 
@@ -633,6 +666,8 @@ unsigned int myID;
 unsigned int virtualLoco;
 bool accStateReq;                                           // peticion de estado de desvio
 byte typeCmdStation;                                        // tipo de central para funciones
+bool lnetProg;                                              // programando CV o LNCV
+byte ulhiProg;                                              // Programming track off (UHLI)
 
 #ifdef USE_PHONE
 
@@ -802,13 +837,16 @@ bool waitResultCV;
 
 WiFiClient ECoS;
 
-#define ID_ECOS         1                                   // Base objects ID
-#define ID_PRGMANAGER   5
-#define ID_POMMANAGER   7
-#define ID_LOKMANAGER   10
-#define ID_SWMANAGER    11
-#define ID_S88MANAGER   26
-#define ID_S88FEEDBACK  100
+#define ID_ECOS             1                               // Base objects ID
+#define ID_PRGMANAGER       5
+#define ID_POMMANAGER       7
+#define ID_LOKMANAGER       10
+#define ID_SWMANAGER        11
+#define ID_SNIFFERMANAGER   25
+#define ID_S88MANAGER       26
+#define ID_BOOSTERMANAGER   27
+#define ID_S88FEEDBACK      100
+#define ID_INTBOOSTER       65000
 
 char cmd[64];                                               // send buffer
 
@@ -1202,6 +1240,9 @@ void initVariables() {
   keypad.setDebounceTime(20);
   encoderValue = 0;
   encoderMax = 2;
+#if (CHANGE_DIR == SWITCH_3P)
+  dirValue = readDirSwitch();
+#endif
   scrOLED = SCR_LOGO;
   optOLED = OPT_SPEED;
   prgOLED = PRG_PTRK;
@@ -1311,6 +1352,8 @@ void initVariables() {
   doDispatchGet = false;
   doDispatchPut = false;
   accStateReq = false;
+  lnetProg = false;
+  ulhiProg = UHLI_PRG_END;
 #ifdef USE_PHONE
   for (pos = 0; pos < MAX_STATION; pos++)                   // lee listin telefonico
     phoneBook[pos] = readEEPROM(EE_PHONE_ME + pos);
@@ -1426,6 +1469,10 @@ void hidProcess() {
     controlSwitch();
   if (keyOn)                                                // se ha pulsado una tecla
     controlKeypad();
+#if (CHANGE_DIR == SWITCH_3P)
+  if (dirChange)                                            // se ha movido el interruptor de direccion
+    controlDirSwitch();
+#endif
   if (millis() - timeButtons > timeoutButtons)              // lectura de boton
     readButtons();
   readKeypad();                                             // lectura de teclado
@@ -1462,7 +1509,7 @@ void updateSpeedHID() {
     case SCR_TURNOUT:                                       // Control loco en menu desvios
 #ifdef USE_LOCONET
       if (mySpeed > 1) {
-        steps =   stepsLN[mySlot.state & 0x07];
+        steps = getMaxStepLnet();
         if (steps == 128) {
           encoderMax = 63;                                    // Max 100% speed (64 pasos, compatible con 14, 28 y 128 pasos)
           encoderValue = (mySpeed > 1) ? (mySpeed >> 1) : 0;  // 0..127 -> 0..63
@@ -1517,7 +1564,7 @@ void updateMySpeed() {
 #ifdef USE_LOCONET
   byte spd, steps;
 
-  steps =   stepsLN[mySlot.state & 0x07];
+  steps = getMaxStepLnet();
   if (steps == 128) {
     if ((encoderValue == 0) && shuntingMode)                  // Modo maniobras
       encoderValue = 1;
@@ -1830,6 +1877,9 @@ void enterMenuOption() {
 void enterPrgOption() {
   modeProg = false;
   modeBit = false;
+#ifdef USE_LOCONET
+  lnetProg = true;
+#endif
   switch (prgOLED) {                                        // entra en la opcion del menu de programacion actual
     case PRG_BIT:
       modeBit = true;

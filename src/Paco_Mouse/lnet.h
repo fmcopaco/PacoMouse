@@ -212,16 +212,6 @@ typedef struct slotmove_t {
   uint8_t chksum;        /* exclusive-or checksum for the message                */
 } slotMoveMsg;
 
-typedef union {
-  uint8_t D[7];
-  struct {
-    uint16_t deviceClass;
-    uint16_t lncvNumber;
-    uint16_t lncvValue;
-    uint8_t flags;
-  } data;
-} UhlenbrockMsgPayload;
-
 typedef struct
 {
   uint8_t command;   // OPC_PEER_XFER for replies, OPC_IMM_PACKET for commands
@@ -231,7 +221,13 @@ typedef struct
   uint8_t DSTH;      // destination, high byte
   uint8_t ReqId;     // Request ID, distinguishes commands
   uint8_t PXCT1;     // MSBs of following data
-  UhlenbrockMsgPayload payload; // Data Bytes
+  uint8_t D0;        // Data Bytes
+  uint8_t D1;
+  uint8_t D2;
+  uint8_t D3;
+  uint8_t D4;
+  uint8_t D5;
+  uint8_t D6;
 } UhlenbrockMsg;
 
 

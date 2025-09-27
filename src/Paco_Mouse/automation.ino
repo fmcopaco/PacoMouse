@@ -227,7 +227,7 @@ void getFileName(byte num, char *buf) {                             // get name 
 void deleteFile(byte posFAT) {                                      // delete file
   unsigned int adr;
   byte data;
-#if defined(USE_Z21) || defined(USE_ECOS)
+#if defined(USE_Z21) || defined(USE_ECOS) || defined(USE_LNWIFI) || defined(USE_XNWIFI)
   changedEEPROM = false;
 #endif
   data = FREE_SECTOR;
@@ -249,7 +249,7 @@ void deleteFile(byte posFAT) {                                      // delete fi
     else
       data = posFAT;
   }
-#if defined(USE_Z21) || defined(USE_ECOS)
+#if defined(USE_Z21) || defined(USE_ECOS) || defined(USE_LNWIFI) || defined(USE_XNWIFI)
   if (changedEEPROM)
     EEPROM.commit();
   DEBUG_MSG("Saving EEPROM")
@@ -289,7 +289,7 @@ void saveEditBuf(byte posFAT) {                                   // save edit b
   byte n, i, nxt, cnt;
   byte pos, data;
   unsigned int adr;
-#if defined(USE_Z21) || defined(USE_ECOS)
+#if defined(USE_Z21) || defined(USE_ECOS) || defined(USE_LNWIFI) || defined(USE_XNWIFI)
   changedEEPROM = false;
 #endif
   usedSectors = getFileSectorCount(posFAT);
@@ -351,7 +351,7 @@ void saveEditBuf(byte posFAT) {                                   // save edit b
 #endif
     }
   }
-#if defined(USE_Z21) || defined(USE_ECOS)
+#if defined(USE_Z21) || defined(USE_ECOS) || defined(USE_LNWIFI) || defined(USE_XNWIFI)
   if (changedEEPROM)
     EEPROM.commit();
   DEBUG_MSG("Saving EEPROM")

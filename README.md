@@ -10,6 +10,7 @@ Firmware for a throttle on the Arduino Nano or Wemos D1 Mini (ESP8266) platform.
   * Automation
   * Games
   * Rotary encoder for loco speed and direction
+  * Option for lever switch direction control
   * Keypad for easy numeric input
   * OLED in different sizes
   * Hardware test program included

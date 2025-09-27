@@ -47,6 +47,7 @@ void beginLnWiFi() {
     }
     else {
       LnWiFi.setNoDelay(true);
+      timeout = millis();
     }
   }
 }
@@ -56,7 +57,13 @@ void lnetSend (lnMsg * Msg) {
   byte n, pos, chk, nibble;
   byte msgLng;
   char msgStr[120];
-
+/*
+  if (isLBServer)                                                   
+    while (millis() - timeout < 10) {                               // workround for Dasy II WLAN
+      if (updateOLED)                                               // Actualizar pantalla
+        showOLED();
+    }
+    */
   chk = 0xFF;
   msgLng = getLnMsgSize(Msg);
   //msgLng = ((Msg->sz.command & 0x60) == 0x60) ? Msg->sz.mesg_size : ((Msg->sz.command & 0x60) >> 4) + 2;
@@ -75,11 +82,18 @@ void lnetSend (lnMsg * Msg) {
     msgStr[pos++] = (nibble > 9) ? nibble + 0x37 : nibble + 0x30;
     nibble = chk & 0x0F;
     msgStr[pos++] = (nibble > 9) ? nibble + 0x37 : nibble + 0x30;
-    msgStr[pos++] = '\r';
+    //msgStr[pos++] = '\r';
     msgStr[pos++] = '\n';
     msgStr[pos++] = '\0';
     LnWiFi.write(msgStr);
     DEBUG_MSG(msgStr);
+    if (isLBServer) {                                                   // workround for Dasy II WLAN
+      sentOK = false;
+      timeout = millis();
+      while ((millis() - timeout < 200) && (!sentOK))                   // wait confirmation
+        lnetReceive();
+      timeout = millis();
+    }
   }
   else {
     for (n = 0; n < msgLng - 1; n++)                                    // Loconet over TCP/IP Binary
@@ -107,21 +121,57 @@ void lnetReceive() {
   byte lng;
   while (LnWiFi.available()) {
     rxByte = LnWiFi.read();
-    if (isLBServer) {                                               // Loconet over TCP/IP LBServer
+    if (isLBServer) {                                               // Loconet over TCP/IP LBServer. https://loconetovertcp.sourceforge.net/Protocol/LoconetOverTcp.html
 #ifdef DEBUG
       Serial.print(rxByte);
 #endif
       switch (rcvStrPhase) {
-        case WAIT_TOKEN:                                            // wait for RECEIVE token
-          if (rxByte == 'R') {                                      // Possible match: RECEIVE. veRsion, bREak, eRRoR Checksum, eRRoR line, eRRoR message / No match: send, sent,timestamp
-            rcvStrPos = 0;
-            rcvStr[rcvStrPos++] = rxByte;
-            rcvStrPhase = RECV_TOKEN;
+        case WAIT_TOKEN:
+          switch (rxByte) {
+            case 'R':                                               // wait for RECEIVE token
+              rcvStrPos = 0;                                        // Possible match: RECEIVE. veRsion, bREak, eRRoR Checksum, eRRoR line, eRRoR message / No match: send, sent,timestamp
+              rcvStr[rcvStrPos++] = rxByte;
+              rcvStrPhase = RECV_TOKEN;
+              break;
+            case 'S':                                               // wait for SENT token
+              rcvStrPos = 0;                                        // Possible match: Send, Sent, timeStamp, verSion, error checkSum, error meSSage / No match: receive, break, error line
+              rcvStr[rcvStrPos++] = rxByte;
+              rcvStrPhase = SENT_TOKEN;
+              break;
+          }
+          break;
+        case SENT_TOKEN:
+          switch (rxByte) {
+            case 'E':                                               // SENT valid characters
+            case 'N':
+            case 'T':
+            case ' ':
+              rcvStr[rcvStrPos++] = rxByte;
+              if (rcvStrPos == 5) {
+                if (! strncmp(rcvStr, "SENT ", 5)) {
+                  rcvStrPhase = SENT_PARAM;
+                  rcvStrPos = 0;
+                  RecvPacket.data[rcvStrPos] = 0;
+                }
+                else
+                  rcvStrPhase = WAIT_TOKEN;
+              }
+              break;
+            default:                                                // SENT invalid characters
+              rcvStrPhase = WAIT_TOKEN;
+              break;
+          }
+          break;
+        case SENT_PARAM:
+          if ((rxByte == '\n') || (rxByte == '\r')) {
+            //DEBUG_MSG("SENT token detected!")
+            sentOK = true;
+            rcvStrPhase = WAIT_TOKEN;
           }
           break;
         case RECV_TOKEN:
           switch (rxByte) {
-            case 'E':                                 // RECEIVE valid characters
+            case 'E':                                               // RECEIVE valid characters
             case 'C':
             case 'I':
             case 'V':
@@ -138,7 +188,7 @@ void lnetReceive() {
                   rcvStrPhase = WAIT_TOKEN;
               }
               break;
-            default:                                 // RECEIVE invalid characters
+            default:                                                // RECEIVE invalid characters
               rcvStrPhase = WAIT_TOKEN;
               break;
           }

@@ -384,13 +384,6 @@ void controlKeypad() {
       break;
     case SCR_WAIT:
       if (keyValue == K_MENU) {
-#ifdef USE_LOCONET
-        doDispatchGet = false;
-#ifdef USE_PHONE
-        if (phonePhase == WAIT_TRAIN)
-          phonePhase = CALL_REJECTED;
-#endif
-#endif
 #if defined(USE_Z21) || defined(USE_XPRESSNET)
         if (csStatus != csNormalOps)
           resumeOperations();
@@ -400,6 +393,16 @@ void controlKeypad() {
           exitProgramming();
 #endif
         showMenu();
+#ifdef USE_LOCONET
+        doDispatchGet = false;
+        lnetProg = false;
+        if (!bitRead(mySlot.trk, 0))
+          showEmergencyOff();
+#ifdef USE_PHONE
+        if (phonePhase == WAIT_TRAIN)
+          phonePhase = CALL_REJECTED;
+#endif
+#endif
       }
       break;
     case SCR_CFG:
@@ -541,7 +544,13 @@ void controlKeypad() {
           enterCVdata = false;
         if (enterCVdata) {                                  // Write CV
 #ifdef USE_LOCONET
-          showWait();
+          if (modeProg) {
+            enterCVdata = false;
+            updateAllOLED = true;
+          }
+          else {
+            showWait();
+          }
 #endif
 #if defined(USE_Z21) || defined(USE_XPRESSNET)
           if (modeProg) {
