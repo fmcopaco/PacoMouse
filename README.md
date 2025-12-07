@@ -30,6 +30,7 @@ Firmware for a throttle on the Arduino Nano or Wemos D1 Mini (ESP8266) platform.
 
   [![PacoMouseAutomation](https://img.youtube.com/vi/WS09ZdihYSQ/0.jpg)](https://www.youtube.com/watch?v=WS09ZdihYSQ)
 
+  [![PacoMouseAutomation](https://img.youtube.com/vi/uLCelb744ps/0.jpg)](https://www.youtube.com/watch?v=uLCelb744ps)
 
 ---
 
