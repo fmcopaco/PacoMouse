@@ -3,7 +3,7 @@
 Firmware for a throttle on the Arduino Nano or Wemos D1 Mini (ESP8266) platform. 
   * Versions for Loconet, Loconet over TCP/IP, Xpressnet, Xpressnet LAN, ECoS or Z21 protocols
   * Control of Locomotives
-  * Control of accesories (turnouts, platform, etc.)
+  * Control of accesories (turnouts, turntable, etc.)
   * CV and LNCV programming
   * Dispatch and phone lock feature
   * Locking of some features for guest or club use.
