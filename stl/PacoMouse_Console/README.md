@@ -17,3 +17,8 @@
 * 3 Brass threaded insert M3x4
 
 
+## Wiring
+
+ ![3dfile](PM_Console_wiring.jpg)
+
+

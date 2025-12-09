@@ -9,6 +9,9 @@ STL files for PacoMouse
 ## PacoMouse Console
 
  ![3dfile](PacoMouse_Console.jpg)
+ ![3dfile](PM_Console_rear.jpg)
+
+
 
 ## Other PacoMouse STL files
 
