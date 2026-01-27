@@ -43,7 +43,7 @@ All rights reserved.
 ## Documentation
 - https://usuaris.tinet.cat/fmco/
 - https://fmcopaco.github.io/
-- Read the [manual](doc/PacoMouse_manual.pdf) in the doc directory
+- Read the [manual](doc/PacoMouse_manual_v0.30.pdf) in the doc directory
 - Step-by-step assembly of PacoMouse by [Isaac](https://www.iguadix.es/content/pacomouse-diy)
 
 ---
