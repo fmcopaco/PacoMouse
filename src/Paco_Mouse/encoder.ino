@@ -72,6 +72,7 @@ void readButtons () {
   if (inputButton != dirValue) {
     dirValue = inputButton;
     dirChange = true;
+    DEBUG_MSG("ADC: %d - %d", analogRead(pinCHG_DIR), dirValue)
   }
 #endif
 }
@@ -510,7 +511,11 @@ void controlSwitch() {                                      // encoder switch
 
 #if (CHANGE_DIR == SWITCH_3P)
 byte readDirSwitch() {
+#if defined(ESP8266)
+  return (map(analogRead(pinCHG_DIR), 0, 1024, 0, 2));
+#else
   return (map(analogRead(pinCHG_DIR), 0, 1024, 0, 3));
+#endif
 }
 
 void controlDirSwitch() {

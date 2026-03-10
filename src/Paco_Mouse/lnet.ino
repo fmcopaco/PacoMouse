@@ -336,9 +336,11 @@ void lnetTimers() {
   yield();
   if (millis() - infoTimer > 1000UL) {                        // Cada segundo
     infoTimer = millis();
+#if (CHANGE_DIR == BUTTON_ENC)
     battery = ESP.getVcc ();                                  // Read VCC voltage
     if (battery < LowBattADC)
       lowBATT = true;
+#endif
   }
 #endif
 }
@@ -1362,6 +1364,7 @@ void sendLNCV (byte id, byte flags) {
   0xE7, 0x0E, 0x00, 0x03, 0x00, 0x03, 0x00, 0x06, 0x08, 0x00, 0x00, 0x49, 0x42, 0x13  "DR5000"                                ADR: 0    ID: 'IB'  SPD: 3
   0xE7, 0x0E, 0x00, 0x03, 0x00, 0x03, 0x00, 0x07, 0x08, 0x00, 0x00, 0x49, 0x42, 0x12  "YD7001"                                ADR: 0    ID: 'IB'  SPD: 3
   0xE7, 0x0E, 0x00, 0x02, 0x42, 0x03, 0x00, 0x07, 0x00, 0x00, 0x15, 0x49, 0x42, 0x4C  "Intellibox II / IB-Basic / IB-Com"     ADR: 'B'  ID: 'IB'  SPD: 3
+  0xE7, 0x0E, 0x00, 0x02, 0x42, 0x03, 0x00, 0x07, 0x00, 0x00, 0x15, 0x49, 0x42, 0x4C  "Intellibox2neo"                        ADR: 'B'  ID: 'IB'  SPD: 3
   0xE7, 0x0E, 0x00, 0x02, 0x42, 0x03, 0x00, 0x06, 0x00, 0x00, 0x15, 0x49, 0x42, 0x4D  "System Control 7"                      ADR: 'B'  ID: 'IB'  SPD: 3
   0xE7, 0x0E, 0x00, 0x02, 0x42, 0x03, 0x00, 0x07, 0x00, 0x00, 0x15, 0x49, 0x42, 0x4C  "Daisy II Tillig"                       ADR: 'B'  ID: 'IB'  SPD: 3
   0xE7, 0x0E, 0x00, 0x02, 0x42, 0x03, 0x00, 0x07, 0x00, 0x00, 0x15, 0x49, 0x42, 0x4C  "Daisy II WLAN"                         ADR: 'B'  ID: 'IB'  SPD: 3
@@ -1394,6 +1397,7 @@ void sendLNCV (byte id, byte flags) {
                IB2:  E5 0F 00 49 4B 08 00 26 10 01 01 01 00 00 28 -> v1.025 - 1.026
              Daisy:  E5 0F 00 49 4B 08 00 02 10 00 00 00 00 00 0D -> 1002 (LNCV 90)
             RB1110:  B4 7D 7F 49                                  -> not supported
+         Z21 Black:                                               -> No answer
      Daisy II WLAN:  E5 0F 00 49 4B 08 00 08 10 00 00 00 00 00 07 -> 1008 (Art. 6521 LNCV90)
 
 
@@ -1405,6 +1409,7 @@ void sendLNCV (byte id, byte flags) {
                IB2:  E5 0F 00 49 4B 09 00 12 00 01 60 60 00 00 0D -> 1200016060
              Daisy:  E5 0F 00 49 4B 09 00 13 00 00 06 05 00 00 0E ->
             RB1110:  B4 7D 7F 49                                  -> not supported
+         Z21 Black:                                               -> No answer
      Daisy II WLAN:  E5 0F 00 49 4B 09 00 13 00 00 21 43 00 00 6F -> UB_WLAN_15544468 (Update ED498CD4) -> MAC: D4-8C-49-ED-30-95 -> 0xED3095 - 1 = 15544468
 
 */

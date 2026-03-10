@@ -39,11 +39,12 @@
        v0.28    26jan25   Using modified and retailed version of Loconet.h library to reduce 0.5K the memory size to support Uhlenbrock programming (30488+678 to 29962+710). Added WiFi version with Loconet over TCP/IP (LBserver & Binary).
        v0.29    18feb25   Added support for Xpressnet WiFi. Added set fast clock option.
        v0.30    30jun25   Corrected bugs in saving automation, Loconet & Z21. Improved support of SSD1309 OLED and Daisy II WLAN.Added support for direction switch 3 positions: FWD(ON)-(OFF)-(ON)REV. Added Czech language.
+       v0.31    08mar26   Corrected bug using 3 position switch on ESP8266 that doesn't overides battery voltage read function.
 */
 
 // Paco Mouse program version
 #define VER_H "0"
-#define VER_L "30"
+#define VER_L "31"
 
 
 //#define DEBUG                                               // Descomentar para mensajes de depuracion
@@ -957,7 +958,9 @@ byte scrPosIP;
 unsigned long infoTimer;
 
 #define LowBattADC  2980                                    // LOW BATT 2.97V
+#if (CHANGE_DIR == BUTTON_ENC)
 ADC_MODE(ADC_VCC);                                          // For Vcc voltage read
+#endif
 int battery;
 bool lowBATT;
 
@@ -1413,7 +1416,9 @@ void initVariables() {
 #endif
 #ifdef USE_Z21
   lowBATT = false;
+#if (CHANGE_DIR == BUTTON_ENC)
   battery = ESP.getVcc ();                                  // Read VCC voltage
+#endif
   infoTimer = millis();
   pingTimer = 0;
   waitResultCV = false;
@@ -1435,7 +1440,9 @@ void initVariables() {
 #endif
 #ifdef USE_ECOS
   lowBATT = false;
+#if (CHANGE_DIR == BUTTON_ENC)
   battery = ESP.getVcc ();                                  // Read VCC voltage
+#endif
   infoTimer = millis();
   timeout = millis();
   csStatus = 0;                                             // Stop

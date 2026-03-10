@@ -299,9 +299,11 @@ bool ECoSProcess() {
   yield();
   if (millis() - infoTimer > 1000UL) {                        // Cada segundo
     infoTimer = millis();
+#if (CHANGE_DIR == BUTTON_ENC)
     battery = ESP.getVcc ();                                  // Read VCC voltage
     if (battery < LowBattADC)
       lowBATT = true;
+#endif
   }
   if (progFinished) {                                                     // fin de lectura/programacion CV
     progFinished = false;
